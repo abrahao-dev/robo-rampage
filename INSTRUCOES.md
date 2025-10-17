@@ -1,14 +1,21 @@
 # 🤖 Robô de Combate "Rampage" - Documentação ESP32
 
+**UNIVERSIDADE SÃO FRANCISCO**
+Engenharia de Computação - 8º Semestre
+Prática Profissional: Sistemas Autônomos e Robótica
+
+---
+
 ## 📋 Especificações Técnicas
 
 - **Classe**: Beetleweight (1,36 kg)
-- **Dimensões**: 30x30 cm
-- **Bateria**: Li-Ion 11,1 V (3S)
+- **Dimensões**: 30 x 30 cm
+- **Bateria**: Li-Ion 11,1V (3S 2P) 4900mAh
 - **Motores**: 2x DC 12V com redução (170 RPM)
 - **Drivers**: 2x BTS7960 (43A cada)
-- **Servo**: MG995
-- **Microcontrolador**: ESP32 DevKit
+- **Servo**: MG995 (alto torque)
+- **Microcontrolador**: ESP32 Doit DevKit
+- **Reguladores**: 2x LM2596 Step-Down com display
 
 ## 🔌 Esquema de Conexões
 
@@ -236,12 +243,36 @@ void loop() {
 
 | Componente | Corrente | Tensão |
 |------------|----------|--------|
-| ESP32 | ~250mA | 5V |
+| ESP32 Doit DevKit | ~250mA | 5V |
 | Servo MG995 | ~1A (pico 2A) | 6V |
 | Motor DC (cada) | ~5-10A | 11,1V |
 | **Total estimado** | **15-25A** | **11,1V** |
 
-**Duração da bateria depende da capacidade (ex: 2200mAh = ~6-10 min uso intenso)**
+**Duração da bateria (4900mAh): ~10-15 min de uso intenso**
+
+---
+
+## 💰 Lista de Componentes e Custos
+
+### Componentes Eletrônicos
+
+| Componente | Quantidade | Preço Unitário | Total |
+|------------|------------|----------------|-------|
+| ESP32 Doit DevKit | 1x | R$ 38,00 | R$ 38,00 |
+| Motor DC 12V com redução (170 RPM) | 2x | R$ 65,00 | R$ 130,00 |
+| Driver Ponte H BTS7960 (43A) | 2x | R$ 50,00 | R$ 100,00 |
+| Bateria Li-Ion 11,1V 3S 2P 4900mAh | 1x | R$ 110,00 | R$ 110,00 |
+| Módulo LM2596 Step-Down com display | 2x | R$ 23,00 | R$ 46,00 |
+| Servo MG995 (alto torque) | 1x | R$ 40,00 | R$ 40,00 |
+
+### Materiais Auxiliares
+
+| Material | Preço |
+|----------|-------|
+| Kit de espaguete termo retrátil | R$ 30,00 |
+| Fios flexíveis coloridos | R$ 22,00 |
+
+### **💵 Custo Total: R$ 516,00**
 
 ## 🚀 Próximos Passos (Expansões Futuras)
 
@@ -260,4 +291,12 @@ Para dúvidas sobre o código:
 
 ---
 
-**Desenvolvido para o Projeto de Robô de Combate - Universidade São Francisco**
+**Desenvolvido para o Projeto de Robô de Combate**
+**UNIVERSIDADE SÃO FRANCISCO**
+Engenharia de Computação - 8º Semestre
+
+**Equipe:**
+- Matheus Abrahão Martins Alvares - 202204581
+- Cauê Becker Rossi - 202204081
+- Bruno Ricci Zanoni - 202213443
+- Giulio Passetti Figueiredo - 202201837

@@ -2,16 +2,28 @@
  * ====================================================================
  * ROBÔ DE COMBATE "RAMPAGE" - ESP32 CONTROLLER
  * ====================================================================
- * Projeto: Engenharia de Computação - Universidade São Francisco
+ * UNIVERSIDADE SÃO FRANCISCO
+ * Engenharia de Computação - 8º Semestre
+ * Prática Profissional: Sistemas Autônomos e Robótica
+ *
+ * Equipe:
+ * - Matheus Abrahão Martins Alvares - 202204581
+ * - Cauê Becker Rossi - 202204081
+ * - Bruno Ricci Zanoni - 202213443
+ * - Giulio Passetti Figueiredo - 202201837
+ *
+ * ====================================================================
+ * ESPECIFICAÇÕES DO ROBÔ:
+ * ====================================================================
  * Classe: Beetleweight (1,36 kg, 30x30 cm)
- * Bateria: Li-Ion 11,1 V (3S)
+ * Bateria: Li-Ion 11,1V (3S 2P) 4900mAh
  *
  * COMPONENTES:
- * - 2x Motores DC 12V com redução (170 RPM)
- * - 2x Drivers BTS7960 (43A cada)
- * - 1x Servo MG995 (arma)
- * - 2x Reguladores LM2596 (5V e 6V)
- * - ESP32 DevKit
+ * - Microcontrolador: ESP32 Doit DevKit
+ * - Motores: 2x DC 12V com redução (170 RPM)
+ * - Drivers: 2x BTS7960 (43A cada)
+ * - Servo: 1x MG995 (alto torque)
+ * - Reguladores: 2x LM2596 Step-Down (5V e 6V)
  *
  * COMANDOS SERIAIS/BLUETOOTH:
  * F    = Frente

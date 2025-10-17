@@ -39,33 +39,37 @@
 #include <ESP32Servo.h>
 
 // ====================================================================
-// CONFIGURAÇÃO DE PINOS
+// CONFIGURAÇÃO DE PINOS - BTS7960 (2 PWM POR MOTOR)
 // ====================================================================
 
-// Motor Esquerdo (BTS7960)
-#define MOTOR_ESQ_EN_L 25 // Enable L (controla direção reversa)
-#define MOTOR_ESQ_EN_R 26 // Enable R (controla direção frente)
-#define MOTOR_ESQ_PWM 27  // PWM (controla velocidade)
+// BTS7960 - Motor ESQUERDO (Driver #1)
+#define L_EN_L 26 // Enable L (sempre HIGH)
+#define R_EN_L 25 // Enable R (sempre HIGH)
+#define LPWM_L 27 // PWM Ré (motor esquerdo)
+#define RPWM_L 14 // PWM Frente (motor esquerdo)
 
-// Motor Direito (BTS7960)
-#define MOTOR_DIR_EN_L 14 // Enable L (controla direção reversa)
-#define MOTOR_DIR_EN_R 12 // Enable R (controla direção frente)
-#define MOTOR_DIR_PWM 13  // PWM (controla velocidade)
+// BTS7960 - Motor DIREITO (Driver #2)
+#define L_EN_R 33 // Enable L (sempre HIGH)
+#define R_EN_R 32 // Enable R (sempre HIGH)
+#define LPWM_R 18 // PWM Ré (motor direito)
+#define RPWM_R 19 // PWM Frente (motor direito)
 
 // Servo da Arma
 #define SERVO_PIN 4 // GPIO4 para controle do servo MG995
 
 // ====================================================================
-// CONFIGURAÇÕES PWM
+// CONFIGURAÇÕES PWM (LEDC)
 // ====================================================================
 
-// Canais PWM do ESP32 (0-15 disponíveis)
-#define PWM_CANAL_ESQ 0
-#define PWM_CANAL_DIR 1
-
 // Configurações PWM
-#define PWM_FREQ 1000   // Frequência PWM em Hz
+#define PWM_FREQ 20000  // 20 kHz para reduzir ruído audível
 #define PWM_RESOLUCAO 8 // Resolução de 8 bits (0-255)
+
+// Canais PWM do ESP32 (0-15 disponíveis)
+#define CH_L_A 0 // LPWM_L (motor esquerdo ré)
+#define CH_L_B 1 // RPWM_L (motor esquerdo frente)
+#define CH_R_A 2 // LPWM_R (motor direito ré)
+#define CH_R_B 3 // RPWM_R (motor direito frente)
 
 // ====================================================================
 // PROTÓTIPOS DAS FUNÇÕES
@@ -105,36 +109,69 @@ const unsigned long TIMEOUT_FAILSAFE = 2000; // 2 segundos sem comando = parar
 String comandoRecebido = ""; // Buffer para comandos multi-caractere
 
 // ====================================================================
-// FUNÇÕES DE CONTROLE DOS MOTORES
+// FUNÇÕES AUXILIARES
+// ====================================================================
+
+/*
+ * Helper inline para escrever PWM com constrain
+ */
+inline void pwmWrite(int canal, int duty)
+{
+  ledcWrite(canal, constrain(duty, 0, 255));
+}
+
+/*
+ * Ajusta a velocidade dos motores (0-9)
+ */
+void ajustarVelocidade(int nivel)
+{
+  nivelVelocidade = constrain(nivel, 0, 9);
+  // Mapear nível 0-9 para PWM 0-255
+  velocidadeAtual = map(nivelVelocidade, 0, 9, 0, 255);
+
+  Serial.print("[VELOCIDADE] Nível: ");
+  Serial.print(nivelVelocidade);
+  Serial.print(" - PWM: ");
+  Serial.println(velocidadeAtual);
+}
+
+// ====================================================================
+// FUNÇÕES DE CONTROLE DOS MOTORES (BTS7960 - 2 PWM POR MOTOR)
 // ====================================================================
 
 /*
  * Inicializa os pinos dos motores e configura PWM
+ * BTS7960 usa 2 PWM por motor: LPWM (ré) e RPWM (frente)
  */
 void inicializarMotores()
 {
-  // Configurar pinos do motor esquerdo
-  pinMode(MOTOR_ESQ_EN_L, OUTPUT);
-  pinMode(MOTOR_ESQ_EN_R, OUTPUT);
-  pinMode(MOTOR_ESQ_PWM, OUTPUT);
+  // Configurar pinos Enable (sempre HIGH para habilitar)
+  pinMode(L_EN_L, OUTPUT);
+  pinMode(R_EN_L, OUTPUT);
+  pinMode(L_EN_R, OUTPUT);
+  pinMode(R_EN_R, OUTPUT);
 
-  // Configurar pinos do motor direito
-  pinMode(MOTOR_DIR_EN_L, OUTPUT);
-  pinMode(MOTOR_DIR_EN_R, OUTPUT);
-  pinMode(MOTOR_DIR_PWM, OUTPUT);
+  digitalWrite(L_EN_L, HIGH); // Habilita canal L do motor esquerdo
+  digitalWrite(R_EN_L, HIGH); // Habilita canal R do motor esquerdo
+  digitalWrite(L_EN_R, HIGH); // Habilita canal L do motor direito
+  digitalWrite(R_EN_R, HIGH); // Habilita canal R do motor direito
 
-  // Configurar canais PWM
-  ledcSetup(PWM_CANAL_ESQ, PWM_FREQ, PWM_RESOLUCAO);
-  ledcSetup(PWM_CANAL_DIR, PWM_FREQ, PWM_RESOLUCAO);
+  // Configurar 4 canais PWM (2 por motor)
+  ledcSetup(CH_L_A, PWM_FREQ, PWM_RESOLUCAO);
+  ledcSetup(CH_L_B, PWM_FREQ, PWM_RESOLUCAO);
+  ledcSetup(CH_R_A, PWM_FREQ, PWM_RESOLUCAO);
+  ledcSetup(CH_R_B, PWM_FREQ, PWM_RESOLUCAO);
 
   // Vincular pinos aos canais PWM
-  ledcAttachPin(MOTOR_ESQ_PWM, PWM_CANAL_ESQ);
-  ledcAttachPin(MOTOR_DIR_PWM, PWM_CANAL_DIR);
+  ledcAttachPin(LPWM_L, CH_L_A); // Motor esquerdo - ré
+  ledcAttachPin(RPWM_L, CH_L_B); // Motor esquerdo - frente
+  ledcAttachPin(LPWM_R, CH_R_A); // Motor direito - ré
+  ledcAttachPin(RPWM_R, CH_R_B); // Motor direito - frente
 
   // Parar motores inicialmente
   pararMotores();
 
-  Serial.println("[INIT] Motores inicializados");
+  Serial.println("[INIT] Motores inicializados (BTS7960 - 2 PWM por motor)");
 }
 
 /*
@@ -142,54 +179,48 @@ void inicializarMotores()
  */
 void pararMotores()
 {
-  // Desabilitar todas as direções
-  digitalWrite(MOTOR_ESQ_EN_L, LOW);
-  digitalWrite(MOTOR_ESQ_EN_R, LOW);
-  digitalWrite(MOTOR_DIR_EN_L, LOW);
-  digitalWrite(MOTOR_DIR_EN_R, LOW);
-
-  // Zerar PWM
-  ledcWrite(PWM_CANAL_ESQ, 0);
-  ledcWrite(PWM_CANAL_DIR, 0);
+  // Zerar todos os PWM
+  pwmWrite(CH_L_A, 0); // Motor esquerdo - ré
+  pwmWrite(CH_L_B, 0); // Motor esquerdo - frente
+  pwmWrite(CH_R_A, 0); // Motor direito - ré
+  pwmWrite(CH_R_B, 0); // Motor direito - frente
 
   Serial.println("[MOTOR] Parado");
 }
 
 /*
  * Move o robô para frente
+ * RPWM ativo (frente), LPWM = 0
  */
 void moverFrente()
 {
-  // Motor esquerdo: frente
-  digitalWrite(MOTOR_ESQ_EN_L, LOW);
-  digitalWrite(MOTOR_ESQ_EN_R, HIGH);
-  ledcWrite(PWM_CANAL_ESQ, velocidadeAtual);
+  // Motor esquerdo: frente (RPWM_L ativo)
+  pwmWrite(CH_L_A, 0);               // LPWM_L = 0 (não vai ré)
+  pwmWrite(CH_L_B, velocidadeAtual); // RPWM_L = velocidade (vai frente)
 
-  // Motor direito: frente
-  digitalWrite(MOTOR_DIR_EN_L, LOW);
-  digitalWrite(MOTOR_DIR_EN_R, HIGH);
-  ledcWrite(PWM_CANAL_DIR, velocidadeAtual);
+  // Motor direito: frente (RPWM_R ativo)
+  pwmWrite(CH_R_A, 0);               // LPWM_R = 0 (não vai ré)
+  pwmWrite(CH_R_B, velocidadeAtual); // RPWM_R = velocidade (vai frente)
 
-  Serial.print("[MOTOR] Frente - Velocidade: ");
+  Serial.print("[MOTOR] Frente - PWM: ");
   Serial.println(velocidadeAtual);
 }
 
 /*
  * Move o robô para trás
+ * LPWM ativo (ré), RPWM = 0
  */
 void moverRe()
 {
-  // Motor esquerdo: ré
-  digitalWrite(MOTOR_ESQ_EN_L, HIGH);
-  digitalWrite(MOTOR_ESQ_EN_R, LOW);
-  ledcWrite(PWM_CANAL_ESQ, velocidadeAtual);
+  // Motor esquerdo: ré (LPWM_L ativo)
+  pwmWrite(CH_L_A, velocidadeAtual); // LPWM_L = velocidade (vai ré)
+  pwmWrite(CH_L_B, 0);               // RPWM_L = 0 (não vai frente)
 
-  // Motor direito: ré
-  digitalWrite(MOTOR_DIR_EN_L, HIGH);
-  digitalWrite(MOTOR_DIR_EN_R, LOW);
-  ledcWrite(PWM_CANAL_DIR, velocidadeAtual);
+  // Motor direito: ré (LPWM_R ativo)
+  pwmWrite(CH_R_A, velocidadeAtual); // LPWM_R = velocidade (vai ré)
+  pwmWrite(CH_R_B, 0);               // RPWM_R = 0 (não vai frente)
 
-  Serial.print("[MOTOR] Ré - Velocidade: ");
+  Serial.print("[MOTOR] Ré - PWM: ");
   Serial.println(velocidadeAtual);
 }
 
@@ -199,16 +230,14 @@ void moverRe()
 void girarEsquerda()
 {
   // Motor esquerdo: ré
-  digitalWrite(MOTOR_ESQ_EN_L, HIGH);
-  digitalWrite(MOTOR_ESQ_EN_R, LOW);
-  ledcWrite(PWM_CANAL_ESQ, velocidadeAtual);
+  pwmWrite(CH_L_A, velocidadeAtual); // LPWM_L = velocidade (ré)
+  pwmWrite(CH_L_B, 0);               // RPWM_L = 0
 
   // Motor direito: frente
-  digitalWrite(MOTOR_DIR_EN_L, LOW);
-  digitalWrite(MOTOR_DIR_EN_R, HIGH);
-  ledcWrite(PWM_CANAL_DIR, velocidadeAtual);
+  pwmWrite(CH_R_A, 0);               // LPWM_R = 0
+  pwmWrite(CH_R_B, velocidadeAtual); // RPWM_R = velocidade (frente)
 
-  Serial.print("[MOTOR] Girando ESQUERDA - Velocidade: ");
+  Serial.print("[MOTOR] Girando ESQUERDA - PWM: ");
   Serial.println(velocidadeAtual);
 }
 
@@ -218,16 +247,14 @@ void girarEsquerda()
 void girarDireita()
 {
   // Motor esquerdo: frente
-  digitalWrite(MOTOR_ESQ_EN_L, LOW);
-  digitalWrite(MOTOR_ESQ_EN_R, HIGH);
-  ledcWrite(PWM_CANAL_ESQ, velocidadeAtual);
+  pwmWrite(CH_L_A, 0);               // LPWM_L = 0
+  pwmWrite(CH_L_B, velocidadeAtual); // RPWM_L = velocidade (frente)
 
   // Motor direito: ré
-  digitalWrite(MOTOR_DIR_EN_L, HIGH);
-  digitalWrite(MOTOR_DIR_EN_R, LOW);
-  ledcWrite(PWM_CANAL_DIR, velocidadeAtual);
+  pwmWrite(CH_R_A, velocidadeAtual); // LPWM_R = velocidade (ré)
+  pwmWrite(CH_R_B, 0);               // RPWM_R = 0
 
-  Serial.print("[MOTOR] Girando DIREITA - Velocidade: ");
+  Serial.print("[MOTOR] Girando DIREITA - PWM: ");
   Serial.println(velocidadeAtual);
 }
 
@@ -252,40 +279,13 @@ void inicializarServo()
  */
 void moverServo(int angulo)
 {
-  if (angulo < 0)
-    angulo = 0;
-  if (angulo > 180)
-    angulo = 180;
-
+  angulo = constrain(angulo, 0, 180);
   anguloServo = angulo;
   servoArma.write(anguloServo);
 
-  Serial.print("[SERVO] Ângulo ajustado para: ");
-  Serial.println(anguloServo);
-}
-
-// ====================================================================
-// FUNÇÕES DE CONTROLE DE VELOCIDADE
-// ====================================================================
-
-/*
- * Ajusta a velocidade dos motores (0-9)
- */
-void ajustarVelocidade(int nivel)
-{
-  if (nivel < 0)
-    nivel = 0;
-  if (nivel > 9)
-    nivel = 9;
-
-  nivelVelocidade = nivel;
-  // Mapear nível 0-9 para PWM 0-255
-  velocidadeAtual = map(nivel, 0, 9, 0, 255);
-
-  Serial.print("[VELOCIDADE] Nível: ");
-  Serial.print(nivelVelocidade);
-  Serial.print(" - PWM: ");
-  Serial.println(velocidadeAtual);
+  Serial.print("[SERVO] Ângulo: ");
+  Serial.print(anguloServo);
+  Serial.println("°");
 }
 
 // ====================================================================
@@ -306,7 +306,7 @@ void processarComando(String cmd)
   // Atualizar timestamp do último comando (fail-safe)
   ultimoComando = millis();
 
-  Serial.print("[CMD] Comando recebido: ");
+  Serial.print("[CMD] ");
   Serial.println(cmd);
 
   // Comandos de movimento
@@ -337,14 +337,14 @@ void processarComando(String cmd)
     ajustarVelocidade(nivel);
   }
   // Comando do servo (A + ângulo, ex: A90, A180)
-  else if (cmd.startsWith("A") && cmd.length() >= 2)
+  else if (cmd.startsWith("A"))
   {
     int angulo = cmd.substring(1).toInt();
     moverServo(angulo);
   }
   else
   {
-    Serial.println("[CMD] Comando não reconhecido!");
+    Serial.println("[CMD] Inválido");
   }
 }
 
@@ -358,24 +358,24 @@ void processarComando(String cmd)
  */
 void verificarFailSafe()
 {
-  unsigned long tempoAtual = millis();
+  unsigned long agora = millis();
 
   // Verificar overflow do millis() (acontece após ~50 dias)
-  if (tempoAtual < ultimoComando)
+  if (agora < ultimoComando)
   {
-    ultimoComando = tempoAtual;
+    ultimoComando = agora;
   }
 
   // Se passou mais de 2 segundos sem comando, parar motores
-  if ((tempoAtual - ultimoComando) > TIMEOUT_FAILSAFE)
+  if (agora - ultimoComando > TIMEOUT_FAILSAFE)
   {
-    static bool failsafeAtivado = false;
+    static bool fs = false;
 
-    if (!failsafeAtivado)
+    if (!fs)
     {
-      Serial.println("[FAIL-SAFE] Timeout! Parando motores...");
+      Serial.println("[FAIL-SAFE] Timeout. Parando motores.");
       pararMotores();
-      failsafeAtivado = true;
+      fs = true;
     }
   }
 }
@@ -388,14 +388,15 @@ void setup()
 {
   // Inicializar comunicação serial
   Serial.begin(115200);
-  delay(500);
+  delay(300);
 
-  Serial.println("\n\n");
+  Serial.println("\n");
   Serial.println("====================================");
   Serial.println("  ROBÔ DE COMBATE RAMPAGE - ESP32");
   Serial.println("====================================");
   Serial.println("Universidade São Francisco");
   Serial.println("Classe: Beetleweight (1,36 kg)");
+  Serial.println("BTS7960 - 2 PWM por motor");
   Serial.println("====================================\n");
 
   // Inicializar componentes
@@ -408,27 +409,27 @@ void setup()
 
   Serial.println("\n[SISTEMA] Pronto para receber comandos!");
   Serial.println("\nComandos disponíveis:");
-  Serial.println("  F    = Frente");
-  Serial.println("  B    = Ré");
-  Serial.println("  L    = Girar Esquerda");
-  Serial.println("  R    = Girar Direita");
-  Serial.println("  S    = Parar");
-  Serial.println("  V0-9 = Velocidade (0=mín, 9=máx)");
-  Serial.println("  Axx  = Servo ângulo (0-180)");
-  Serial.println("\nFail-safe: 2s sem comando = parar\n");
+  Serial.println("  F      = Frente");
+  Serial.println("  B      = Ré");
+  Serial.println("  L      = Girar Esquerda");
+  Serial.println("  R      = Girar Direita");
+  Serial.println("  S      = Parar");
+  Serial.println("  V0..9  = Velocidade (0=mín, 9=máx)");
+  Serial.println("  A0..180 = Servo ângulo");
+  Serial.println("\nFail-safe: 2s sem comando => STOP\n");
 }
 
 void loop()
 {
   // Verificar se há dados disponíveis na serial
-  while (Serial.available() > 0)
+  while (Serial.available())
   {
     char c = Serial.read();
 
     // Se recebeu nova linha ou carriage return, processar comando
     if (c == '\n' || c == '\r')
     {
-      if (comandoRecebido.length() > 0)
+      if (comandoRecebido.length())
       {
         processarComando(comandoRecebido);
         comandoRecebido = "";
@@ -454,23 +455,36 @@ void loop()
 
 /*
  * Teste de motores (pode ser chamado no setup para diagnóstico)
+ * Descomente a chamada no setup() para executar
  */
 void testeMotores()
 {
   Serial.println("\n[TESTE] Iniciando teste de motores...");
 
   Serial.println("[TESTE] Motor Esquerdo - Frente");
-  digitalWrite(MOTOR_ESQ_EN_L, LOW);
-  digitalWrite(MOTOR_ESQ_EN_R, HIGH);
-  ledcWrite(PWM_CANAL_ESQ, 150);
+  pwmWrite(CH_L_A, 0);
+  pwmWrite(CH_L_B, 150);
+  delay(2000);
+  pararMotores();
+  delay(500);
+
+  Serial.println("[TESTE] Motor Esquerdo - Ré");
+  pwmWrite(CH_L_A, 150);
+  pwmWrite(CH_L_B, 0);
   delay(2000);
   pararMotores();
   delay(500);
 
   Serial.println("[TESTE] Motor Direito - Frente");
-  digitalWrite(MOTOR_DIR_EN_L, LOW);
-  digitalWrite(MOTOR_DIR_EN_R, HIGH);
-  ledcWrite(PWM_CANAL_DIR, 150);
+  pwmWrite(CH_R_A, 0);
+  pwmWrite(CH_R_B, 150);
+  delay(2000);
+  pararMotores();
+  delay(500);
+
+  Serial.println("[TESTE] Motor Direito - Ré");
+  pwmWrite(CH_R_A, 150);
+  pwmWrite(CH_R_B, 0);
   delay(2000);
   pararMotores();
   delay(500);
